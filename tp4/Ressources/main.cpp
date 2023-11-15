@@ -1,7 +1,6 @@
-#include <iostream>
+ #include <iostream>
 #include <string>
 using namespace std;
-
 
 static const uint8_t S[16]={ 
   0x3, 0xE, 0x1, 0xA, 0x4, 0x9, 0x5, 0x6, 0x8, 0xB, 0xF, 0x2, 0xD, 0xC, 0x0, 0x7
@@ -57,13 +56,13 @@ public :
 
   uint8_t encrypt(uint8_t input)
   {
-    // TODO
-    return 0;
+    uint8_t output = S[(int)(k0^input)]^k1;
+    return output;
   }
 
   uint8_t decrypt(uint8_t input)
   {
-    // TODO
+    uint8_t output = S_inv[(int)(k1^input)]^k0;
     return 0;        
   }
 };
