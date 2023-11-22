@@ -1,5 +1,12 @@
+/*PArtie I.
+    Question 2: La boite S à la fin ne rajoute pas de sécurité car la boite S-1 est connu.
+    Donc il suffit juste de repasser le texte chiffré dans une S-1 pour enlever cette dernière étape.
+    Cela rajoute du temps de calcul mais pas de la sécurité
+*/
+
 #include <iostream>
 #include <string>
+#include <vector>
 using namespace std;
 
 static const uint8_t S[16] = {
@@ -101,11 +108,19 @@ public:
     }
 
     printf("\n Creating XOR differential table:\n");
-
-    /* Question 1 : compléter le code afin d'afficher la matrice T des différences */
-    // TODO
-
-    /* Affichage des différences dans un tableau */
+    for (uint8_t i = 0; i < 16; i++)
+    {
+      X = i;
+      for (uint8_t j = 0; j < 16; j++)
+      {
+        Xp = j;
+        DX = X ^ Xp;
+        Y = S[(int)X];
+        Yp = S[(int)Xp];
+        DY = Y ^ Yp;
+        T[(int)DX][(int)DY]++;
+      }
+    }
     for (i = 0; i < 16; ++i)
     {
       printf("[");
@@ -121,6 +136,31 @@ public:
     /* TODO */
     /* Identifier les différentielles apparaissant avec plus forte probabilité */
     /* Elles seront exploitées dans la suite de l'attaque */
+    int occur_max ;
+    occur_max = T[1][1];
+    for(int i = 1; i < 16; i++){
+      for (int j = 1 ; j < 16 ; j++){
+          if (T[i][j] > occur_max) occur_max = T[i][j];
+      }
+    }
+    std::vector<std::pair<uint8_t,uint8_t>>diff;
+    for(int i = 1; i < 16; i++){
+      for (int j = 1 ; j < 16 ; j++){
+          if (T[i][j] == occur_max){
+            diff.push_back(std::make_pair((uint8_t)i,(uint8_t)j));
+          }
+      }
+    }
+
+
+    //affichage couple (DX,DY)
+    for(std::pair<uint8_t,uint8_t> element : diff)
+    {
+      std::cout << "(DX :"<<(int)element.first<<";DY :"<<(int)element.second<<")"<<std::endl;
+    }
+    //choix couple alétoirement
+    //int index = rand() % diff.size();
+    //diff[index]
   }
 
   void genCharData(int diffIn, int diffOut)
@@ -188,8 +228,8 @@ int main()
   uint8_t diffIn = 0;
   uint8_t diffOut = 0;
 
-  // Cryptanalysis cryptanalysis;
-  // cryptanalysis.findBestDiffs();                                                                //Find some good differentials in the S-Boxes
+  Cryptanalysis cryptanalysis;
+  cryptanalysis.findBestDiffs();                                                                //Find some good differentials in the S-Boxes
   // cryptanalysis.genCharData(diffIn, diffOut);                                                          //Find inputs that lead a certain characteristic
   // cryptanalysis.genPairs(cipher, diffIn, nbPairs);                                                                //Generate chosen-plaintext pairs
   // cryptanalysis.findGoodPair(diffOut,nbPairs);                                                            //Choose a known pair that satisfies the characteristic
