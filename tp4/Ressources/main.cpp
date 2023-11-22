@@ -201,9 +201,12 @@ public:
   {
     printf("\n Generating %i known pairs with input differential of %x.\n", nbPairs, diffIn);
 
-    /* Question 2 : compléter le code afin de produire des paires de chiffrés avec la bonne différence */
+    uint8_t P0 = rand() % 16;
+    uint8_t P1 = P0 ^diffIn;
+    uint8_t C0 = x.encrypt(P0);
+    uint8_t C1 = x.encrypt(P1);
+    
 
-    // TODO
   }
 
   void findGoodPair(int diffOut, int nbPairs)
@@ -258,7 +261,7 @@ int main()
   Cryptanalysis cryptanalysis;
   cryptanalysis.findBestDiffs();              // Find some good differentials in the S-Boxes
   cryptanalysis.genCharData(diffIn, diffOut); // Find inputs that lead a certain characteristic
-  // cryptanalysis.genPairs(cipher, diffIn, nbPairs);                                                                //Generate chosen-plaintext pairs
+  cryptanalysis.genPairs(cipher, diffIn, nbPairs);                                                                //Generate chosen-plaintext pairs
   // cryptanalysis.findGoodPair(diffOut,nbPairs);                                                            //Choose a known pair that satisfies the characteristic
   // cryptanalysis.crack(nbPairs);                                                                    //Use charData and "good pair" in find key
 
