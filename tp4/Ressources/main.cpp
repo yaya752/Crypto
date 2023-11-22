@@ -136,41 +136,68 @@ public:
     /* TODO */
     /* Identifier les différentielles apparaissant avec plus forte probabilité */
     /* Elles seront exploitées dans la suite de l'attaque */
-    int occur_max ;
+    int occur_max;
     occur_max = T[1][1];
-    for(int i = 1; i < 16; i++){
-      for (int j = 1 ; j < 16 ; j++){
-          if (T[i][j] > occur_max) occur_max = T[i][j];
-      }
-    }
-    std::vector<std::pair<uint8_t,uint8_t>>diff;
-    for(int i = 1; i < 16; i++){
-      for (int j = 1 ; j < 16 ; j++){
-          if (T[i][j] == occur_max){
-            diff.push_back(std::make_pair((uint8_t)i,(uint8_t)j));
-          }
-      }
-    }
-
-
-    //affichage couple (DX,DY)
-    for(std::pair<uint8_t,uint8_t> element : diff)
+    for (int i = 1; i < 16; i++)
     {
-      std::cout << "(DX :"<<(int)element.first<<";DY :"<<(int)element.second<<")"<<std::endl;
+      for (int j = 1; j < 16; j++)
+      {
+        if (T[i][j] > occur_max)
+          occur_max = T[i][j];
+      }
     }
-    //choix couple alétoirement
-    //int index = rand() % diff.size();
-    //diff[index]
+    std::vector<std::pair<uint8_t, uint8_t>> diff;
+    for (int i = 1; i < 16; i++)
+    {
+      for (int j = 1; j < 16; j++)
+      {
+        if (T[i][j] == occur_max)
+        {
+          diff.push_back(std::make_pair((uint8_t)i, (uint8_t)j));
+        }
+      }
+    }
+
+    // affichage couple (DX,DY)
+    for (std::pair<uint8_t, uint8_t> element : diff)
+    {
+      std::cout << "(DX :" << (int)element.first << ";DY :" << (int)element.second << ")" << std::endl;
+    }
   }
 
-  void genCharData(int diffIn, int diffOut)
+  void genCharData(uint8_t diffIn, uint8_t diffOut)
   {
     printf("\n Generating possible intermediate values based on differential (%x --> %x):\n", diffIn, diffOut);
-
+    std::vector<std::pair<uint8_t, uint8_t>> Couples_X_Xp;
+    uint8_t X, Xp, Y, Yp, DX, DY;
+    for (uint8_t i = 0; i < 16; i++)
+    {
+      X =i;
+      for (uint8_t j = 0; j < 16; j++)
+      {
+        Xp = j;
+        DX = X ^ Xp;
+        if (DX== diffIn)
+        {
+          Y = S[(int)X];
+          Yp = S[(int)Xp];
+          DY = Y ^ Yp;
+          if (diffOut == DY)
+          {
+            Couples_X_Xp.push_back(std::make_pair(X, Xp));
+          }
+        }
+      }
+    }
+    std::cout << "-----------------------------------" << std::endl;
+    for (std::pair<uint8_t, uint8_t> element : Couples_X_Xp)
+    {
+      std::cout << "(X :" << (int)element.first << ";Xp :" << (int)element.second << ")" << std::endl;
+    }
     // TODO
   }
 
-  void genPairs(Cipher cipher, uint8_t diffIn, int nbPairs)
+  void genPairs(Cipher x, uint8_t diffIn, int nbPairs)
   {
     printf("\n Generating %i known pairs with input differential of %x.\n", nbPairs, diffIn);
 
@@ -224,13 +251,13 @@ int main()
   else
     printf(" --> Failure\n");
 
-  int nbPairs = 0; // Define number of known pairs (note that 16 is a brut force)
-  uint8_t diffIn = 0;
-  uint8_t diffOut = 0;
+  int nbPairs = 6; // Define number of known pairs (note that 16 is a brut force)
+  uint8_t diffIn = 4;
+  uint8_t diffOut = 7;
 
   Cryptanalysis cryptanalysis;
-  cryptanalysis.findBestDiffs();                                                                //Find some good differentials in the S-Boxes
-  // cryptanalysis.genCharData(diffIn, diffOut);                                                          //Find inputs that lead a certain characteristic
+  cryptanalysis.findBestDiffs();              // Find some good differentials in the S-Boxes
+  cryptanalysis.genCharData(diffIn, diffOut); // Find inputs that lead a certain characteristic
   // cryptanalysis.genPairs(cipher, diffIn, nbPairs);                                                                //Generate chosen-plaintext pairs
   // cryptanalysis.findGoodPair(diffOut,nbPairs);                                                            //Choose a known pair that satisfies the characteristic
   // cryptanalysis.crack(nbPairs);                                                                    //Use charData and "good pair" in find key
