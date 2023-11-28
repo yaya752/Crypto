@@ -29,18 +29,6 @@ private:
   const uint8_t S_inv[16] = {
       0xE, 0x2, 0xB, 0x0, 0x4, 0x6, 0x7, 0xF, 0x8, 0x5, 0x3, 0x9, 0xD, 0xC, 0x1, 0xA};
 
-  uint8_t roundFunc(uint8_t input)
-  {
-    // TODO
-    return 0;
-  }
-
-  uint8_t roundFunc_inv(uint8_t input)
-  {
-    // TODO
-    return 1;
-  }
-
 public:
   Cipher()
   {
@@ -172,12 +160,12 @@ public:
     uint8_t X, Xp, Y, Yp, DX, DY;
     for (uint8_t i = 0; i < 16; i++)
     {
-      X =i;
+      X = i;
       for (uint8_t j = 0; j < 16; j++)
       {
         Xp = j;
         DX = X ^ Xp;
-        if (DX== diffIn)
+        if (DX == diffIn)
         {
           Y = S[(int)X];
           Yp = S[(int)Xp];
@@ -200,36 +188,85 @@ public:
   void genPairs(Cipher x, uint8_t diffIn, int nbPairs)
   {
     printf("\n Generating %i known pairs with input differential of %x.\n", nbPairs, diffIn);
-
-    uint8_t P0 = rand() % 16;
-    uint8_t P1 = P0 ^diffIn;
-    uint8_t C0 = x.encrypt(P0);
-    uint8_t C1 = x.encrypt(P1);
-    
-
+    for (int i = 0; i < nbPairs; i++)
+    {
+      uint8_t P0 = rand() % 16;
+      uint8_t P1 = P0 ^ diffIn;
+      uint8_t C0 = x.encrypt(P0);
+      uint8_t C1 = x.encrypt(P1);
+      knownP0[i] = P0;
+      knownP1[i] = P1;
+      knownC0[i] = C0;
+      knownC1[i] = C1;
+    }
   }
 
-  void findGoodPair(int diffOut, int nbPairs)
+  void findGoodPair(uint8_t diffOut, int nbPairs)
   {
     printf("\n Searching for good pair:\n");
+    bool trouver = false;
+    int i = 0;
+    while (!trouver && i < nbPairs)
+    {
+      if ((knownC0[i] ^ knownC1[i] )== diffOut)
+      {
+        goodP0 = knownP0[i];
+        goodP1 = knownP1[i];
+        goodC0 = knownC0[i];
+        goodC1 = knownC1[i];
+        trouver = true;
+      }
+      i++;
+    }
 
-    /* Question 4 : compléter le code afin de produire une paire avec la bonne caractéristique en se basant sur le chiffrement */
-
-    // TODO
-    if (true)
+    if (!trouver)
+    {
       printf(" No good pair found!\n");
+    }
+    else
+    {
+      std::cout << "P0 : " << (int)goodP0 << ";P1: " << (int)goodP1 << ";C0: " << (int)goodC0 << ";C1: " << (int)goodC1 << std::endl;
+    }
   }
 
-  int testKey(int testK0, int testK1, int nbPairs)
+  int testKey(int testK1, int nbPairs)
   {
-    // TODO
-  }
+    int count = 0;
 
+    for (int i = 0; i < nbPairs; i++)
+    {
+        uint8_t decrypted0 = S_inv[testK1 ^ knownC0[i]];
+        uint8_t decrypted1 = S_inv[testK1 ^ knownC1[i]];
+
+        if ((decrypted0 ^ decrypted1) == (knownP0[i] ^ knownP1[i]))
+        {
+            count++;
+        }
+    }
+
+    return count;
+    
+  }
   void crack(int nbPairs)
   {
     printf("\nBrute forcing reduced keyspace:\n");
+    uint8_t bestKey0 = -1;
+    uint8_t bestKey1 = -1;
+    int bestCount = -1;
 
-    // TODO
+    for (uint8_t testK1 = 0; testK1 < 16; testK1++)
+    {
+        int count = testKey( testK1, nbPairs);
+
+        if (count > bestCount)
+        {
+            bestKey1 = testK1;
+            bestCount = count;
+        }
+    }
+    bestKey0 = S_inv[ goodC0 ^ bestKey1] ^ goodP0;
+    printf("Best potential key: k0 = %x, k1 = %x\n", bestKey0, bestKey1);
+
   }
 };
 
@@ -259,11 +296,11 @@ int main()
   uint8_t diffOut = 7;
 
   Cryptanalysis cryptanalysis;
-  cryptanalysis.findBestDiffs();              // Find some good differentials in the S-Boxes
-  cryptanalysis.genCharData(diffIn, diffOut); // Find inputs that lead a certain characteristic
-  cryptanalysis.genPairs(cipher, diffIn, nbPairs);                                                                //Generate chosen-plaintext pairs
-  // cryptanalysis.findGoodPair(diffOut,nbPairs);                                                            //Choose a known pair that satisfies the characteristic
-  // cryptanalysis.crack(nbPairs);                                                                    //Use charData and "good pair" in find key
+  cryptanalysis.findBestDiffs();                   // Find some good differentials in the S-Boxes
+  cryptanalysis.genCharData(diffIn, diffOut);      // Find inputs that lead a certain characteristic
+  cryptanalysis.genPairs(cipher, diffIn, nbPairs); // Generate chosen-plaintext pairs
+  cryptanalysis.findGoodPair(diffOut, nbPairs);    // Choose a known pair that satisfies the characteristic
+  cryptanalysis.crack(nbPairs);                                                                    //Use charData and "good pair" in find key
 
   return 0;
 }
