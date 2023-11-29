@@ -47,14 +47,16 @@ public:
 
   uint8_t encrypt(uint8_t input)
   {
-    uint8_t output = S[(int)(k0 ^ input)] ^ k1;
-    return output;
+    //on utilise le schéma pour trouver le cipher text
+    uint8_t ciphertext = S[(int)(k0 ^ input)] ^ k1;
+    return ciphertext;
   }
 
   uint8_t decrypt(uint8_t input)
   {
-    uint8_t output = S_inv[(int)(k1 ^ input)] ^ k0;
-    return output;
+    //on lit le schéma dans le sens inverse pour trouver le plain text
+    uint8_t plaintext = S_inv[(int)(k1 ^ input)] ^ k0;
+    return plaintext;
   }
 };
 
@@ -84,9 +86,11 @@ public:
   /* Difference Distribution Table of the S-boxe */
   void findBestDiffs(void)
   {
+    //on cherche à touver les meilleures différentielles 
     uint8_t i, j;
     uint8_t X, Xp, Y, Yp, DX, DY;
     uint8_t T[16][16]; // Tableau pour comptabiliser les occurrences
+    //Creation de la matrice des Dx Dy 
     for (i = 0; i < 16; ++i)
     {
       for (j = 0; j < 16; ++j)
@@ -94,7 +98,7 @@ public:
         T[i][j] = 0;
       }
     }
-
+    //remplissage de la matrice: les occurrences produites en sortie par les Dx Dy
     printf("\n Creating XOR differential table:\n");
     for (uint8_t i = 0; i < 16; i++)
     {
@@ -109,6 +113,7 @@ public:
         T[(int)DX][(int)DY]++;
       }
     }
+    //on affiche la matrice obtenue
     for (i = 0; i < 16; ++i)
     {
       printf("[");
@@ -121,7 +126,6 @@ public:
 
     printf("\n Displaying most probable differentials:\n");
 
-    /* TODO */
     /* Identifier les différentielles apparaissant avec plus forte probabilité */
     /* Elles seront exploitées dans la suite de l'attaque */
     int occur_max;
@@ -134,6 +138,7 @@ public:
           occur_max = T[i][j];
       }
     }
+    //on construit une liste de paires Dx Dy ayant l'occurence maximale
     std::vector<std::pair<uint8_t, uint8_t>> diff;
     for (int i = 1; i < 16; i++)
     {
@@ -155,6 +160,7 @@ public:
 
   void genCharData(uint8_t diffIn, uint8_t diffOut)
   {
+    //trouver tous les X et Xp qui donnent les différentielles trouvées (qui correspondent à l'occurence maximale) précédemment
     printf("\n Generating possible intermediate values based on differential (%x --> %x):\n", diffIn, diffOut);
     std::vector<std::pair<uint8_t, uint8_t>> Couples_X_Xp;
     uint8_t X, Xp, Y, Yp, DX, DY;
@@ -182,11 +188,12 @@ public:
     {
       std::cout << "(X :" << (int)element.first << ";Xp :" << (int)element.second << ")" << std::endl;
     }
-    // TODO
+  
   }
 
   void genPairs(Cipher x, uint8_t diffIn, int nbPairs)
   {
+    //on génère de manière aléatoire le nb de paires nécessaires qui correspondent à Dx
     printf("\n Generating %i known pairs with input differential of %x.\n", nbPairs, diffIn);
     for (int i = 0; i < nbPairs; i++)
     {
@@ -203,6 +210,7 @@ public:
 
   void findGoodPair(uint8_t diffOut, int nbPairs)
   {
+    //on cherche une paire qui produit Dy parmi celles trouvées précédemment 
     printf("\n Searching for good pair:\n");
     bool trouver = false;
     int i = 0;
@@ -231,6 +239,8 @@ public:
 
   int testKey(int testK1, int nbPairs)
   {
+    //Grace aux paires trouvées précedemment et les diffs on teste les cas afin de trouver 
+    //une valeur potentielle qui satisfait Dx 
     int count = 0;
 
     for (int i = 0; i < nbPairs; i++)
@@ -249,11 +259,11 @@ public:
 
   void crack(int nbPairs)
   {
+    //on retrouve les clés en regardant la clé la plus probable 
     printf("\nBrute forcing reduced keyspace:\n");
     uint8_t bestKey0 = -1;
     uint8_t bestKey1 = -1;
-    int bestCount = -1;
-
+    //on essaie de trouver K1 en premier qui satisfait la condition count == nombre de paires
     for (uint8_t testK1 = 0; testK1 < 16; testK1++)
     {
       int count = testKey(testK1, nbPairs);
@@ -264,8 +274,8 @@ public:
         break; // On a trouvé la bonne clé, pas besoin de continuer
       }
     }
-
-    bestKey0 = S_inv[goodC0 ^ bestKey1] ^ goodP0;
+    //on retrouve K0 en utilisant S inverse et k1 trouvée précedemment
+    bestKey0 = (S_inv[goodC0 ^ bestKey1]^ goodP0);
     printf("Best potential key: k0 = %x, k1 = %x\n", bestKey0, bestKey1);
   }
 };
