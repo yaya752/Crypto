@@ -208,7 +208,7 @@ public:
     int i = 0;
     while (!trouver && i < nbPairs)
     {
-      if ((knownC0[i] ^ knownC1[i] )== diffOut)
+      if ((knownC0[i] ^ knownC1[i]) == diffOut)
       {
         goodP0 = knownP0[i];
         goodP1 = knownP1[i];
@@ -235,18 +235,18 @@ public:
 
     for (int i = 0; i < nbPairs; i++)
     {
-        uint8_t decrypted0 = S_inv[testK1 ^ knownC0[i]];
-        uint8_t decrypted1 = S_inv[testK1 ^ knownC1[i]];
+      uint8_t decrypted0 = S_inv[testK1 ^ knownC0[i]];
+      uint8_t decrypted1 = S_inv[testK1 ^ knownC1[i]];
 
-        if ((decrypted0 ^ decrypted1) == (knownP0[i] ^ knownP1[i]))
-        {
-            count++;
-        }
+      if ((decrypted0 ^ decrypted1) == (knownP0[i] ^ knownP1[i]))
+      {
+        count++;
+      }
     }
 
     return count;
-    
   }
+
   void crack(int nbPairs)
   {
     printf("\nBrute forcing reduced keyspace:\n");
@@ -256,17 +256,17 @@ public:
 
     for (uint8_t testK1 = 0; testK1 < 16; testK1++)
     {
-        int count = testKey( testK1, nbPairs);
+      int count = testKey(testK1, nbPairs);
 
-        if (count > bestCount)
-        {
-            bestKey1 = testK1;
-            bestCount = count;
-        }
+      if (count == nbPairs)
+      {
+        bestKey1 = testK1;
+        break; // On a trouvé la bonne clé, pas besoin de continuer
+      }
     }
-    bestKey0 = S_inv[ goodC0 ^ bestKey1] ^ goodP0;
-    printf("Best potential key: k0 = %x, k1 = %x\n", bestKey0, bestKey1);
 
+    bestKey0 = S_inv[goodC0 ^ bestKey1] ^ goodP0;
+    printf("Best potential key: k0 = %x, k1 = %x\n", bestKey0, bestKey1);
   }
 };
 
@@ -300,7 +300,7 @@ int main()
   cryptanalysis.genCharData(diffIn, diffOut);      // Find inputs that lead a certain characteristic
   cryptanalysis.genPairs(cipher, diffIn, nbPairs); // Generate chosen-plaintext pairs
   cryptanalysis.findGoodPair(diffOut, nbPairs);    // Choose a known pair that satisfies the characteristic
-  cryptanalysis.crack(nbPairs);                                                                    //Use charData and "good pair" in find key
+  cryptanalysis.crack(nbPairs);                    // Use charData and "good pair" in find key
 
   return 0;
 }
