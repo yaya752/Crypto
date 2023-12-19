@@ -182,7 +182,7 @@ public:
     {
       std::cout << "(X :" << (int)element.first << ";Xp :" << (int)element.second << ")" << std::endl;
     }
-    // TODO
+
   }
 
   void genPairs(Cipher x, uint8_t diffIn, int nbPairs)
