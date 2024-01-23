@@ -5,7 +5,7 @@
 .SUFFIXES:.cpp .o
 
 #Nom de l'executable
-EXEC=tp6
+EXEC=tp7
 
 #Liste des fichiers sources separes par des espaces
 SOURCES=main.cpp

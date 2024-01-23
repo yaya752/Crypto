@@ -101,9 +101,9 @@ int main()
      */
     std::cout << "Public Keys  (e,n): ( " << e_str <<" , " << n_str << " )" << std::endl;
     std::cout << "Private Keys (d,n): ( " << d_str <<" , " << n_str << " )" << std::endl;
-    /*
-     *  Encrypt
-     */
+    // Encrypt
+    
+    
 
     //TODO
     
