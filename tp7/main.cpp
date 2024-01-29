@@ -1,150 +1,370 @@
 //
 //  TP7_Shamir's Secret Sharing Scheme
-//  
+//
 
 #include <stdio.h>
 #include <iostream>
 #include <gmp.h>
 
-#define BITSTRENGTH  14              /* size of prime number (p) in bits */
+#define BITSTRENGTH 14 /* size of prime number (p) in bits */
 #define DEBUG true
 
+void cleanup(mpz_t *array, int size)
+{
+    for (int i = 0; i < size; ++i)
+    {
+        mpz_clear(array[i]);
+    }
+}
+void generateRandomCoefficients(mpz_t coefficients[], int numCoefficients, const mpz_t p, gmp_randstate_t state)
+{
+
+    for (int i = 0; i < numCoefficients; ++i)
+    {
+        mpz_init(coefficients[i]);
+
+        // Generate a random number within the range [1, p-1]
+        mpz_urandomm(coefficients[i], state, p);
+        mpz_add_ui(coefficients[i], coefficients[i], 1); // Adjust the range to [1, p-1]
+    }
+}
+void computeShares(mpz_t *x, mpz_t *y, const mpz_t S, const mpz_t a[], int n, int degree, mpz_t p)
+{
+    mpz_t Somme, term;
+
+    // Initialize arrays
+    for (int i = 0; i < n; ++i)
+    {
+        mpz_init(x[i]);
+        mpz_init(y[i]);
+    }
+
+    // Compute shares for each user
+    for (int i = 0; i < n; ++i)
+    {
+        mpz_init(Somme);
+        mpz_init(term);
+
+        // Set login value x[i]
+        mpz_set_ui(x[i], i + 1);
+
+        // Compute shares
+        mpz_set(Somme, S);
+
+        // Compute the polynomial term
+        mpz_set_ui(term, 0);
+        for (int j = 0; j < degree; ++j)
+        {
+            mpz_t temp;
+            mpz_init(temp);
+            mpz_pow_ui(temp, x[i], j + 1);
+            // term = term * (x[i] - j)
+            mpz_mul(temp, temp, a[j]);
+            mpz_add(term, term, temp);
+
+            mpz_clear(temp);
+        }
+
+        // Add the polynomial term to the share
+        mpz_add(y[i], Somme, term);
+        mpz_mod(y[i], y[i], p);
+
+        // Clear temporary variables
+        mpz_clear(Somme);
+        mpz_clear(term);
+    }
+}
+void copyTable(mpz_t *source, mpz_t *destination, int sourceSize, int destinationSize)
+{
+    // Vérification que la taille de la destination est plus grande ou égale à la taille de la source
+    if (destinationSize < sourceSize)
+    {
+        std::cout << "Erreur : La taille de destination doit être plus grande ou égale à la taille de la source." << std::endl;
+        return;
+    }
+
+    // Copie des éléments de la source vers la destination
+    for (int i = 0; i < sourceSize; ++i)
+    {
+        mpz_init_set(destination[i], source[i]);
+    }
+
+    mpz_init_set_ui(destination[destinationSize - 1], 0);
+}
+void increment(mpz_t number)
+{
+    mpz_add_ui(number, number, 1);
+}
+void addUser(mpz_t **x, mpz_t **y, int new_n, const mpz_t S, const mpz_t a[], int degree, mpz_t p)
+{
+    mpz_t Somme, term;
+    mpz_init(Somme);
+    mpz_init(term);
+
+    // Allocate memory for new arrays
+    mpz_t *new_y = new mpz_t[new_n];
+    mpz_t *new_x = new mpz_t[new_n];
+
+    // Copy old values to new arrays
+    copyTable(*x, new_x, new_n - 1, new_n);
+    copyTable(*y, new_y, new_n - 1, new_n);
+    increment(new_x[new_n - 2]);
+    mpz_init_set(new_x[new_n - 1], (*x)[new_n - 2]);
+
+    mpz_set(Somme, S);
+
+    // Compute the polynomial term
+    mpz_set_ui(term, 0);
+    for (int j = 0; j < degree; ++j)
+    {
+        mpz_t temp;
+        mpz_init(temp);
+        mpz_pow_ui(temp, new_x[new_n - 1], j + 1);
+
+        mpz_mul(temp, temp, a[j]);
+        mpz_add(term, term, temp);
+
+        mpz_clear(temp);
+    }
+
+    // Add the polynomial term to the share
+    mpz_add(new_y[new_n - 1], Somme, term);
+    //mpz_mod(new_y[new_n - 1], new_y[new_n - 1], p);
+
+    // Clear temporary variables
+    mpz_clear(Somme);
+    mpz_clear(term);
+
+    // Print new values
+    char x_str[1000], y_str[1000];
+    mpz_get_str(x_str, 10, new_x[new_n - 1]);
+    mpz_get_str(y_str, 10, new_y[new_n - 1]);
+    std::cout << "new X : " << x_str << ", new Y : " << y_str << std::endl;
+    
+    // Deallocate memory for old arrays
+    for (int i = 0; i < new_n - 1; ++i)
+    {
+        mpz_clear((*x)[i]);
+        mpz_clear((*y)[i]);
+    }
+
+    // Assign new arrays to x and y
+    delete[] *x;
+    delete[] *y;
+    *x = new_x;
+    *y = new_y;
+}
+// Function to compute Lagrange interpolation for secret reconstruction
+void lagrangeInterpolation(mpz_t result, const mpz_t x[], const mpz_t y[], int k, const mpz_t p)
+{
+    mpz_t temp, term, alpha;
+    mpz_init(temp);
+    mpz_init(alpha);
+    mpz_init(term);
+    mpz_set_ui(result, 0);
+
+    for (int i = 0; i < k; ++i)
+    {
+        mpz_set_ui(temp, 1);
+        mpz_init_set_str(alpha, "1", 0);
+        for (int j = 0; j < k; ++j)
+        {
+            if (i != j)
+            {
+                mpz_t temp;
+                mpz_init(temp);
+                // xi -xj
+                mpz_sub(temp, x[j], x[i]);
+                // 1/(xi-xj)
+                mpz_invert(temp, temp, p);
+                // xj/(xi-xj)
+                mpz_mul(temp, x[j], temp);
+                // multiply with the previous alpha_i
+                mpz_mul(alpha, alpha, temp);
+                // we are within Z/pZ
+                mpz_mod(alpha, alpha, p);
+            }
+        }
+        /* reconstruction of the secret */
+
+        mpz_mul(term, alpha, y[i]); // Compute alpha_i * y_i
+        mpz_add(result, result, term);
+        mpz_mod(result, result, p); // Calculate the sum modulo prime
+    }
+
+    mpz_clear(temp);
+    mpz_clear(term);
+}
 /* Main subroutine */
 int main()
 {
     /* Declare variables */
-    int n = 4;          // Numbers of users (max)
-    int k = 3;          // Threshold : minimal number of users => secret
+    int n, k;
+    std::cout << "Enter the number of users (n): ";
+    //std::cin >> n;
+    std::cout << "Enter the threshold (k): ";
+    //std::cin >> k;
+    n = 5; 
+    k = 4;
+    while (k > n)
+    {
+        std::cout << "Enter a valid threshold (k < n) : ";
+        std::cin >> k;
+    }
+    mpz_t p;  // Prime number
+    mpz_t S;  // Secret
+    mpz_t Sr; // Reconstruction of the Secret
 
-    mpz_t p;            // Prime number
-    mpz_t S;            // Secret
-    mpz_t Sr;           // Reconstruction of the Secret
+    mpz_t a[k - 1]; // Coefficients of polynom
 
-    mpz_t a1, a2;       // Coefficients of polynom
-    mpz_t alpha1,alpha2,alpha3;  // Lagrangian polynomials in zero
-
-    mpz_t x1,x2,x3,x4;  // Login users
-    mpz_t y1,y2,y3,y4;  // Shares of users
+    gmp_randstate_t state;
+    // Set a random seed for better randomness
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state, time(NULL));
 
     /* This function creates the shares computation. The basic algorithm is...
-    *
-    *  1. Initialize Prime Number : we work into Z/pZ
-    *  2. Initialize Secret Number : S
-    *  3. Compute a random polynom of order k-1
-    *  4. Shares computation for each users (xi, yi) for i in [1,n]
-    *  5. Reconstruct the secret with k users or more
-    *
-    */
-    
+     *
+     *  1. Initialize Prime Number : we work into Z/pZ
+     *  2. Initialize Secret Number : S
+     *  3. Compute a random polynom of order k-1
+     *  4. Shares computation for each users (xi, yi) for i in [1,n]
+     *  5. Reconstruct the secret with k users or more
+     *
+     */
+
     /*
      *  Step 1: Initialize Prime Number : we work into Z/pZ
      */
 
-    mpz_init(p); mpz_init_set_str(p, "11", 0);
-    
-    //TODO: Delete this part and compute a prime number randomly
-    
+    mpz_init(p);
+
+    // Generate a random number of the specified bit length
+    mpz_urandomb(p, state, BITSTRENGTH);
+
+    // Make sure the number is odd
+    mpz_setbit(p, 0);
+
+    // Use a probabilistic primality test to find a prime number
+    mpz_nextprime(p, p);
+
     if (DEBUG)
     {
-        char p_str[1000]; mpz_get_str(p_str,10,p);
-        std::cout << "Random Prime 'p' = " << p_str <<  std::endl;
+        char p_str[1000];
+        mpz_get_str(p_str, 10, p);
+        std::cout << "Random Prime 'p' = " << p_str << std::endl;
     }
 
     /*
      *  Step 2: Initialize Secret Number
      */
 
-    mpz_init(S); mpz_init_set_str(S, "5", 0);
-    
-    //TODO: Delete this part and compute the secret randomly ( warning: inside Z/pZ )
-    
+    mpz_init(S);
+
+    // Generate a random number within the range [1, prime-1] (in Z/pZ)
+    mpz_urandomm(S, state, p);
+
     if (DEBUG)
     {
-        char S_str[1000]; mpz_get_str(S_str,10,S);
-        std::cout << "Secret number 'S' = " << S_str <<  std::endl;
+        char S_str[1000];
+        mpz_get_str(S_str, 10, S);
+        std::cout << "Random Secret 'S' = " << S_str << std::endl;
     }
 
     /*
-     *  Step 3: Initialize Coefficient of polynom
+     *  Step 3: Initialize Coefficient of polynomial
      */
-    mpz_init(a1); mpz_init_set_str(a1, "3", 0);
-    mpz_init(a2); mpz_init_set_str(a2, "10", 0);
-    
-    //TODO: Delete this part and compute the coeffiecients randomly ( warning: inside Z/pZ )
-    
+    generateRandomCoefficients(a, k - 1, p, state);
+    /*
+    mpz_init(a1);
+
+    // Generate a random number within the range [1, prime-1]
+    mpz_urandomm(a1, state, p);
+
+    mpz_init(a2);
+
+    // Generate a random number within the range [1, prime-1]
+    mpz_urandomm(a2, state, p);*/
     if (DEBUG)
     {
-        char a1_str[1000]; mpz_get_str(a1_str,10,a1);
-        char a2_str[1000]; mpz_get_str(a2_str,10,a2);
-        char S_str[1000];  mpz_get_str(S_str,10,S);
-        std::cout << "Polynom 'P(X)' = " << a2_str << "X^2 + " << a1_str << "X + " << S_str << std::endl;
+        for (int i = 0; i < k - 1; ++i)
+        {
+            char coeff_str[1000];
+            mpz_get_str(coeff_str, 10, a[i]);
+            std::cout << "X^" << i + 1 << "*" << coeff_str << std::endl;
+        }
     }
-    
+
     /*
      *  Step 4: Shares computation for each users (xi, yi)
      */
-    mpz_init(x1); mpz_init_set_str(x1, "2", 0);
-    mpz_init(x2); mpz_init_set_str(x2, "4", 0);
-    mpz_init(x3); mpz_init_set_str(x3, "6", 0);
-    mpz_init(x4); mpz_init_set_str(x4, "8", 0);
+    mpz_t *x = new mpz_t[n]; // Array of login values
+    mpz_t *y = new mpz_t[n]; // Array of shares
 
-    mpz_init(y1); mpz_init_set_str(y1, "7", 0);
-    mpz_init(y2); mpz_init_set_str(y2, "1", 0);
-    mpz_init(y3); mpz_init_set_str(y3, "9", 0);
-    mpz_init(y4); mpz_init_set_str(y4, "9", 0);
-    
-    //TODO: Delete this part and compute the shares of all users with public login
-    
+    computeShares(x, y, S, a, n, k - 1, p);
+
     if (DEBUG)
     {
-        char x1_str[1000]; mpz_get_str(x1_str,10,x1);
-        char x2_str[1000]; mpz_get_str(x2_str,10,x2);
-        char x3_str[1000]; mpz_get_str(x3_str,10,x3);
-        char x4_str[1000]; mpz_get_str(x4_str,10,x4);
-
-        char y1_str[1000]; mpz_get_str(y1_str,10,y1);
-        char y2_str[1000]; mpz_get_str(y2_str,10,y2);
-        char y3_str[1000]; mpz_get_str(y3_str,10,y3);
-        char y4_str[1000]; mpz_get_str(y4_str,10,y4);
-        
-        std::cout << "Login and share of each users : " << "( x1="<< x1_str << " ; y1=" << y1_str << " ) , "  << "( x2="<< x2_str << " ; y2=" << y2_str << " ) , "  << "( x3="<< x3_str << " ; y3=" << y3_str << " ) , "  << "( x4="<< x4_str << " , y4=" << y4_str << " )" << std::endl;
+        for (int i = 0; i < n; ++i)
+        {
+            char x_str[1000], y_str[1000];
+            mpz_get_str(x_str, 10, x[i]);
+            mpz_get_str(y_str, 10, y[i]);
+            std::cout << "User " << i + 1 << ": x = " << x_str << ", y = " << y_str << std::endl;
+        }
     }
 
     /*
      *  Step 5: Sample for reconstruct the secret with 3 users (x1, x2, x3)
      */
-    mpz_init(alpha1); mpz_init_set_str(alpha1, "3", 0);
-    mpz_init(alpha2); mpz_init_set_str(alpha2, "8", 0);
-    mpz_init(alpha3); mpz_init_set_str(alpha3, "1", 0);
+    mpz_t alpha[k]; // Array of Lagrangian polynomial coefficients
+    mpz_t secret;   // Reconstructed secret
+    mpz_init(secret);
+    lagrangeInterpolation(secret, x, y, k, p);
 
-    //TODO: Delete this part and automatically compute the secret with k or more shares
-    
-    // Compute Secret = sum_{i=1}^{k} alpha_i x y_i
-    mpz_init(Sr); mpz_init_set_str(Sr, "0", 0);
-    mpz_t temp; mpz_init(temp);
-    
-    mpz_mul(temp,alpha1,y1);
-    mpz_add(Sr, Sr, temp);
-    mpz_mul(temp,alpha2,y2);
-    mpz_add(Sr, Sr, temp);
-    mpz_mul(temp,alpha3,y3);
-    mpz_add(Sr, Sr, temp);
-    mpz_mod(Sr, Sr, p );
-    
     if (DEBUG)
     {
-        char Sr_str[1000]; mpz_get_str(Sr_str,10,Sr);
+        char Sr_str[1000];
+        mpz_get_str(Sr_str, 10, secret);
         std::cout << "Reconstruction of the secret : S = " << Sr_str << std::endl;
     }
-    
+    char choice;
+    bool run = true;
+    while (run)
+    {
+        std::cout << "Do you want to increment n, k, both, or exit? (n/k/b/e)";
+        std::cin >> choice;
+
+        switch (choice)
+        {
+        case 'n':
+            n++;
+            addUser(&x, &y, n, S, a, k - 1, p);
+            break;
+        case 'k':
+            std::cout << "Enter new value for k: ";
+            std::cin >> k;
+            break;
+        case 'b':
+            std::cout << "Enter new value for n: ";
+            n++;
+            addUser(&x, &y, n, S, a, k - 1, p);
+            std::cout << "Enter new value for k: ";
+            std::cin >> k;
+            break;
+        case 'e':
+            run = false;
+            break;
+        default:
+            std::cout << "Invalid choice. Nothing will be changed." << std::endl;
+            break;
+        };
+    };
     /* Clean up the GMP integers */
-    mpz_clear(y1);mpz_clear(y2);mpz_clear(y3);mpz_clear(y4);
-    mpz_clear(x1);mpz_clear(x2);mpz_clear(x3);mpz_clear(x4);
-    mpz_clear(alpha1);mpz_clear(alpha2);mpz_clear(alpha3);
-    mpz_clear(a1);mpz_clear(a2);
-    mpz_clear(temp);
-    mpz_clear(Sr);
+    // Clean up initialized login values
+    cleanup(x, n);
+    cleanup(y, n);
+    cleanup(a, k);
     mpz_clear(S);
     mpz_clear(p);
+    gmp_randclear(state);
 }
-
